@@ -5,21 +5,23 @@ use chrono::{Local, Duration as ChronoDuration};
 use image::ImageFormat;
 use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 use std::time::{Duration, Instant};
+use std::fs::create_dir_all;
 use std::error::Error;
+use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(600.0, 200.0)), // Correct way to set the window size
+        initial_window_size: Some(egui::vec2(600.0, 200.0)),
         ..Default::default()
     };
     
     eframe::run_native(
         "Overwatch", 
         options, 
-        Box::new(|_cc| Box::new(MyApp::new())) // Remove `Ok`
+        Box::new(|_cc| Box::new(MyApp::new()))
     );
 
-    Ok(()) // Return Ok(()) to satisfy the main function's Result type
+    Ok(())
 }
 
 struct MyApp {
@@ -145,9 +147,11 @@ impl eframe::App for MyApp {
                     Local::now().format("%Y%m%d_%H%M%S").to_string() // Use timestamp if no custom name is provided
                 };
 
+                let folder_path = create_screenshot_folder(&name_prefix).expect("Failed to create folder");
+
                 let counter = Arc::clone(&self.screenshot_counter); // Clone the atomic counter for the thread
                 thread::spawn(move || {
-                    start_screenshot_process(interval, duration, name_prefix, counter);
+                    start_screenshot_process(interval, duration, folder_path, counter);
                 });
             }
 
@@ -165,7 +169,16 @@ impl eframe::App for MyApp {
     }
 }
 
-fn start_screenshot_process(interval: Duration, duration: ChronoDuration, name_prefix: String, counter: Arc<AtomicU64>) {
+fn create_screenshot_folder(name_prefix: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let base_folder = "screenshots"; // Base folder to store all sessions
+    let unique_folder_name = format!("{}_{}", name_prefix, Local::now().format("%H%M%S"));
+    let folder_path = PathBuf::from(base_folder).join(unique_folder_name);
+
+    create_dir_all(&folder_path)?; // Create the directory, including parent folders if necessary
+    Ok(folder_path)
+}
+
+fn start_screenshot_process(interval: Duration, duration: ChronoDuration, folder_path: PathBuf, counter: Arc<AtomicU64>) {
     let start_time = Local::now();
     let monitors = Monitor::all().unwrap(); // Get all monitors
 
@@ -177,7 +190,7 @@ fn start_screenshot_process(interval: Duration, duration: ChronoDuration, name_p
             let image = monitor.capture_image().unwrap();
 
             // Create a filename with either the custom name or timestamp
-            let filename = format!("{}_{}_{}.png", name_prefix, monitor.name(), Local::now().format("%Y%m%d_%H%M%S"));
+            let filename = folder_path.join(format!("{}_{}.png", monitor.name(), Local::now().format("%Y%m%d_%H%M%S")));
 
             // Write the screenshot to a PNG file
             image.save_with_format(&filename, ImageFormat::Png).unwrap();
