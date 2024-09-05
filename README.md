@@ -25,11 +25,11 @@
 
 ### Light Mode
 
-![Overwatch Light Mode](assets/light_mode.png)
+![Overwatch Light Mode](src/assets/light_mode.png)
 
 ### Dark Mode
 
-![Overwatch Dark Mode](assets/dark_mode.png)
+![Overwatch Dark Mode](src/assets/dark_mode.png)
 
 ## Installation
 
