@@ -21,6 +21,16 @@
 - **Custom or Auto-Naming**: Choose between timestamp-based filenames or custom names for each session.
 - **Dark/Light Mode Toggle**: Switch between a user-friendly light or dark theme.
 
+## Screenshots
+
+### Light Mode
+
+![Overwatch Light Mode](assets/light_mode.png)
+
+### Dark Mode
+
+![Overwatch Dark Mode](assets/dark_mode.png)
+
 ## Installation
 
 ### Prerequisites
