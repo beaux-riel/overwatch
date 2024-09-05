@@ -41,7 +41,6 @@ struct MyApp {
 
 impl MyApp {
     fn new() -> Self {
-        // Initialize in dark mode by default
         MyApp {
             interval_hours: 0,
             interval_minutes: 0,
@@ -54,7 +53,7 @@ impl MyApp {
             custom_name: String::new(),
             screenshot_counter: Arc::new(AtomicU64::new(0)),
             total_screenshots: 0,
-            dark_mode: true,  // Start in dark mode
+            dark_mode: true,
         }
     }
 }
@@ -68,6 +67,7 @@ impl eframe::App for MyApp {
             ctx.set_visuals(egui::Visuals::light());
         }
 
+        // Main panel for input and Start button
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Title on the left
@@ -75,12 +75,7 @@ impl eframe::App for MyApp {
 
                 // Button on the far right
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let button_label = if self.dark_mode {
-                        "Light Mode"
-                    } else {
-                        "Dark Mode"
-                    };
-
+                    let button_label = if self.dark_mode { "Light Mode" } else { "Dark Mode" };
                     if ui.button(button_label).clicked() {
                         self.dark_mode = !self.dark_mode;
                         if self.dark_mode {
@@ -95,73 +90,105 @@ impl eframe::App for MyApp {
             // Interval input (hours, minutes, seconds)
             ui.horizontal(|ui| {
                 ui.label("Interval between screenshots:");
-                ui.add(egui::DragValue::new(&mut self.interval_hours).prefix("hours: ").speed(1));
-                ui.add(egui::DragValue::new(&mut self.interval_minutes).prefix("minutes: ").speed(1));
-                ui.add(egui::DragValue::new(&mut self.interval_seconds).prefix("seconds: ").speed(1));
+
+                // Align interval inputs to the right
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add(egui::DragValue::new(&mut self.interval_seconds).prefix("seconds: ").speed(1));
+                    ui.add(egui::DragValue::new(&mut self.interval_minutes).prefix("minutes: ").speed(1));
+                    ui.add(egui::DragValue::new(&mut self.interval_hours).prefix("hours: ").speed(1));
+                });
             });
 
             // Duration input (hours, minutes, seconds)
             ui.horizontal(|ui| {
                 ui.label("Total duration:");
-                ui.add(egui::DragValue::new(&mut self.duration_hours).prefix("hours: ").speed(1));
-                ui.add(egui::DragValue::new(&mut self.duration_minutes).prefix("minutes: ").speed(1));
-                ui.add(egui::DragValue::new(&mut self.duration_seconds).prefix("seconds: ").speed(1));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add(egui::DragValue::new(&mut self.duration_seconds).prefix("seconds: ").speed(1));
+                    ui.add(egui::DragValue::new(&mut self.duration_minutes).prefix("minutes: ").speed(1));
+                    ui.add(egui::DragValue::new(&mut self.duration_hours).prefix("hours: ").speed(1));
+                });
             });
 
-            // Checkbox to toggle between default name and custom name
-            ui.checkbox(&mut self.use_custom_name, "Use custom name for screenshots");
-
-            // If custom name is selected, show a text input field
-            if self.use_custom_name {
-                ui.horizontal(|ui| {
-                    ui.label("Custom name:");
-                    ui.text_edit_singleline(&mut self.custom_name);
-                });
-            }
-
-            // Start button
-            if ui.button("Start").clicked() && !self.is_running {
-                self.is_running = true;
-                self.screenshot_counter.store(0, Ordering::Relaxed); // Reset the counter
-
-                // Calculate interval and duration from input
-                let interval = Duration::from_secs(
-                    self.interval_hours * 3600 +
-                    self.interval_minutes * 60 +
-                    self.interval_seconds
-                );
-
-                let duration = ChronoDuration::seconds(
-                    (self.duration_hours * 3600 +
-                     self.duration_minutes * 60 +
-                     self.duration_seconds) as i64
-                );
-
-                // Calculate the total number of expected screenshots
-                self.total_screenshots = (duration.num_seconds() as u64) / interval.as_secs();
-
-                // Start the screenshot process with the appropriate naming scheme
-                let name_prefix = if self.use_custom_name && !self.custom_name.is_empty() {
-                    self.custom_name.clone()
-                } else {
-                    Local::now().format("%Y%m%d_%H%M%S").to_string() // Use timestamp if no custom name is provided
-                };
-
-                let folder_path = create_screenshot_folder(&name_prefix).expect("Failed to create folder");
-
-                let counter = Arc::clone(&self.screenshot_counter); // Clone the atomic counter for the thread
-                thread::spawn(move || {
-                    start_screenshot_process(interval, duration, folder_path, counter);
-                });
-            }
-
-            // Show the screenshot count and total expected screenshots
-            let current_count = self.screenshot_counter.load(Ordering::Relaxed); // Read the atomic counter
+            // Custom name checkbox/input in the same row
             ui.horizontal(|ui| {
-                ui.label(format!(
-                    "Screenshots taken: {}/{}",
-                    current_count, self.total_screenshots
-                ));
+                // Left-aligned checkbox
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.checkbox(&mut self.use_custom_name, "Use custom name for screenshots");
+                });
+
+                // Right-aligned custom name input with placeholder behavior
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if self.use_custom_name {
+                        if self.custom_name.is_empty() {
+                            // Display hint text in gray when the custom name is empty
+                            ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY);
+                            let hint = "Enter custom name...";
+                            let response = ui.text_edit_singleline(&mut self.custom_name);
+                            if response.changed() && self.custom_name.is_empty() {
+                                // Manually copy the hint into the field to simulate placeholder behavior
+                                self.custom_name = hint.to_string();
+                            }
+                            ui.visuals_mut().override_text_color = None; // Reset the color after
+                        } else {
+                            // Normal input field
+                            ui.text_edit_singleline(&mut self.custom_name);
+                        }
+                    }
+                });
+            });
+
+            // Add the "Start" button on its own line at the bottom of the main panel
+            ui.add_space(10.0); // Add some space before the Start button
+            ui.horizontal_centered(|ui| {
+                // Center the Start button without stretching it
+                if ui.add_sized(egui::vec2(100.0, 30.0), egui::Button::new("Start")).clicked() && !self.is_running {
+                    self.is_running = true;
+                    self.screenshot_counter.store(0, Ordering::Relaxed); // Reset the counter
+
+                    // Calculate interval and duration from input
+                    let interval = Duration::from_secs(
+                        self.interval_hours * 3600 +
+                        self.interval_minutes * 60 +
+                        self.interval_seconds
+                    );
+
+                    let duration = ChronoDuration::seconds(
+                        (self.duration_hours * 3600 +
+                         self.duration_minutes * 60 +
+                         self.duration_seconds) as i64
+                    );
+
+                    // Calculate the total number of expected screenshots
+                    self.total_screenshots = (duration.num_seconds() as u64) / interval.as_secs();
+
+                    // Start the screenshot process with the appropriate naming scheme
+                    let name_prefix = if self.use_custom_name && !self.custom_name.is_empty() {
+                        self.custom_name.clone()
+                    } else {
+                        Local::now().format("%Y%m%d_%H%M%S").to_string() // Ensure there's no semicolon here
+                    };
+
+                    let folder_path = create_screenshot_folder(&name_prefix).expect("Failed to create folder");
+
+                    let counter = Arc::clone(&self.screenshot_counter); // Clone the atomic counter for the thread
+                    thread::spawn(move || {
+                        start_screenshot_process(interval, duration, folder_path, counter);
+                    });
+                }
+            });
+        });
+
+        // Bottom panel for Screenshot count
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                // Align the screenshot count to the far right
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let current_count = self.screenshot_counter.load(Ordering::Relaxed); // Read the atomic counter
+                    ui.label(format!(
+                        "Screenshots taken: {}/{}",
+                        current_count, self.total_screenshots
+                    ));
+                });
             });
         });
 
