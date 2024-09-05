@@ -1,0 +1,13 @@
+[package]
+name = "Overwatch"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+screenshots = "0.8.10"
+image = "0.25.2"
+chrono = "0.4.19"
+egui = "0.28.1"
+egui_extras = "0.28.1"
+eframe = "0.20"
+xcap = "0.0.13"
